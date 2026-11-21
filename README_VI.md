@@ -1,108 +1,51 @@
-# NTN LEO Research Lab — Step 2 sửa độ phủ + Step 3 LSTM
+# NTN AI LEO — Bản vá hiệu năng và ổn định
 
-## Mục đích bản cập nhật
+Bản này được cập nhật từ `NTN_AI_LEO_FAST_SIM.zip` hiện có. Mục tiêu là xử lý các điểm được rà soát mà không đổi mô hình vật lý, mô hình 7 Beam, mô hình LSTM, ba chính sách Handover hoặc công thức KPI.
 
-Bản này giữ nguyên trang mô phỏng Trái Đất 3D, texture bản đồ, lưới kinh/vĩ tuyến, trạm mặt đất, quỹ đạo Kepler, chuyển ECI → ECEF và link budget Ka-band trong `app.py` bạn gửi.
+## Các chỉnh sửa trong bản này
 
-Điểm sửa chính nằm ở bộ tạo Dataset:
+1. **Xác nhận file hoàn chỉnh:** `app.py` có đầy đủ phần cuối của Trang 03 và đã được kiểm tra cú pháp bằng `py_compile`.
+2. **Chọn max nhanh, ổn định:** thay `np.argsort(...)[0]` bằng `np.argmax(scores)`. Khi có điểm bằng nhau, `argmax` chọn phần tử đầu tiên theo thứ tự ứng viên; không cần sắp xếp toàn bộ.
+3. **Không giữ KPI cũ sau khi áp dụng cấu hình mới:** khi nhấn `ÁP DỤNG & LƯU CẤU HÌNH`, kết quả Handover cũ trong `session_state` bị xóa. Trang 03 yêu cầu chạy lại với cấu hình mới.
+4. **Chống lỗi `ho_duration`:** nếu `settings.json` chứa thời lượng không thuộc danh sách `[300, 600, 720, 1200]`, giao diện sẽ chọn mặc định 720 giây thay vì gây `ValueError`.
+5. **Tối ưu Trang 02:** thay vòng lặp Python theo từng giây × từng vệ tinh bằng cùng hàm mô phỏng NumPy vector hóa đang dùng ở Trang 03. Tùy chọn lấy mẫu 1/2/5/10 giây vẫn được tôn trọng.
+6. **Cache tìm kịch bản phủ sóng:** cấu hình pha/RAAN đã tìm được được cache theo các tham số và vị trí UE.
 
-- Bản cũ dịch RAAN trung tâm thêm 11° sau mỗi kịch bản và pha thêm 23° một cách cố định. Với UE cố định, nhiều cấu hình bị lệch khỏi vùng phủ của Hà Nội; CSV trước đó chỉ có SCN_01 có candidate.
-- Bản mới đánh giá nhanh các tổ hợp RAAN/pha trước khi tạo dữ liệu. Chương trình ưu tiên chọn kịch bản có ít nhất một khoảng thời gian liên kết đủ điều kiện tại UE.
-- Vẫn lưu tất cả vệ tinh và mọi thời điểm, kể cả dưới chân trời; không xóa các mẫu outage.
-- Bổ sung bảng audit theo từng scenario để thấy số mẫu candidate và Elevation cực đại.
-- Bổ sung `ai/train_lstm.py` để huấn luyện LSTM, chia train/validation/test theo `scenario_id`, so sánh với baseline giữ nguyên SNR cuối cùng, và lưu MAE/RMSE.
+## Kiểm tra đã thực hiện
 
-## A. Cài và chạy website
+- `python -m py_compile app.py`: đạt.
+- Đối chiếu mô phỏng scalar với mô phỏng vector hóa trên 3 mặt phẳng × 4 vệ tinh × 121 mốc thời gian: Beam ID và `candidate` trùng nhau.
+- Sai khác cực đại đo được: Elevation `3.84e-13°`; khoảng cách `1.82e-12 km`; range-rate `1.78e-15 km/s`; Doppler `2.27e-13 kHz`; Beam offset `4.05e-14 dB`.
+- Kiểm tra chu kỳ lấy mẫu 5 giây: các mốc `0, 5, 10, 15, 20` được tạo đúng.
 
-1. Giải nén toàn bộ ZIP vào thư mục mới, ví dụ `C:\NTN_AI_STEP2_LSTM`.
-2. Không xóa `bmng_preview.jpg`, `requirements.txt` hoặc các file trong ZIP.
-3. Chạy `CHAY_UNG_DUNG.bat` hoặc mở Terminal tại thư mục dự án và chạy:
+Các kiểm tra trên xác nhận tương đương số học của mô hình trong các trường hợp thử nghiệm; chưa phải kiểm thử giao diện toàn bộ trên máy Windows của bạn.
 
-```powershell
-py -3.12 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m streamlit run app.py
-```
+## Cách cập nhật an toàn
 
-4. Mở `http://localhost:8501`.
-5. Chọn trang `02 — Time-series Link Quality`.
+**Chỉ thay file `app.py` trong thư mục dự án hiện tại. Không xóa toàn bộ thư mục dự án.**
 
-## B. Sinh lại Dataset — không dùng CSV cũ để huấn luyện chính thức
-
-Các CSV đã tải ở phiên bản trước có 10 scenario nhưng chỉ SCN_01 có candidate; các scenario còn lại không có mẫu đạt Elevation ≥ 10°. Dữ liệu đó không phù hợp để đánh giá AI lựa chọn vệ tinh theo nhiều kịch bản.
-
-Dùng cấu hình kiểm tra ban đầu:
-
-| Tham số | Giá trị |
-|---|---:|
-| UE | TĐ. Hà Nội |
-| Số mặt phẳng | 3 |
-| Vệ tinh/mặt phẳng | 4 |
-| Độ cao | 600 km |
-| Góc nghiêng | 53° |
-| RAAN trung tâm | 98° |
-| Khoảng cách RAAN giữa mặt phẳng | 4° |
-| Số kịch bản | 10 |
-| Thời gian mỗi kịch bản | 720 s |
-| Chu kỳ lấy mẫu | 1 s |
-
-Nhấn `GENERATE DATASET`. Sau khi chạy xong, kiểm tra bảng `Kiểm tra độ phủ theo từng kịch bản`:
-
-- Phải có 10/10 scenario có `Mẫu đủ điều kiện` lớn hơn 0.
-- Với cấu hình trên, số dòng dự kiến là `10 × 721 × 12 = 86.520`.
-- Giá trị thiếu và NaN/vô cực phải bằng 0.
-
-Tải CSV và đặt đúng tên, đúng vị trí:
-
-`data\ntn_link_quality_dataset.csv`
-
-Nếu trình duyệt tải về tên `ntn_link_quality_dataset (1).csv`, hãy đổi tên thành `ntn_link_quality_dataset.csv` trước khi chép vào `data`.
-
-## C. Huấn luyện LSTM
-
-Khuyến nghị dùng Python 3.12 trên Windows. Cần Internet lần đầu để cài PyTorch và các thư viện.
-
-Cách đơn giản:
-
-1. Đóng website hoặc để website không chạy trong lúc huấn luyện.
-2. Đặt CSV vào `data\ntn_link_quality_dataset.csv`.
-3. Nhấp đúp `CHAY_HUAN_LUYEN_AI.bat`.
-
-Hoặc chạy trong Terminal:
+1. Dừng Streamlit bằng `Ctrl + C` trong Terminal.
+2. Sao lưu file cũ thành `app_backup_before_patch.py`.
+3. Chép `app.py` trong gói này vào đúng thư mục dự án đang chạy, ghi đè file cũ.
+4. Giữ nguyên các thư mục và file riêng của bạn:
+   - `models/lstm_snr.pth`
+   - `models/lstm_scalers.joblib`
+   - `results/step3_lstm/`
+   - `earth_texture.jpg` hoặc `earth_atmos_2048.jpg` hoặc `bmng_preview.jpg`
+   - `settings.json`
+   - `data/` và các CSV đã tạo.
+5. Chạy lại:
 
 ```powershell
-.venv\Scripts\python.exe -m pip install -r requirements_ai.txt
-.venv\Scripts\python.exe ai\train_lstm.py --csv data\ntn_link_quality_dataset.csv --output-dir results\step3_lstm
+.venv\Scripts\python.exe -m streamlit run app.py --server.port 8502
 ```
 
-Cấu hình mặc định:
+Mở `http://localhost:8502`.
 
-- Input: 30 mẫu quá khứ.
-- Horizon: dự báo SNR sau 5 giây.
-- Features: elevation, distance, range rate, Doppler, delay, FSPL, công suất thu, SNR hiện tại và trạng thái trên chân trời.
-- Mô hình: LSTM 1 lớp, 32 hidden units, Dense head.
-- Tối đa 15 epoch, batch size 1024, lấy cửa sổ cách nhau 5 mẫu để giảm thời gian chạy CPU; early stopping.
-- Chia train/validation/test theo kịch bản, không chia ngẫu nhiên từng dòng.
+## Lưu ý về tốc độ
 
-## D. Kết quả sau huấn luyện
-
-Mô hình và scaler:
-
-- `models\lstm_snr.pth`
-- `models\lstm_scalers.joblib`
-
-Kết quả đánh giá:
-
-- `results\step3_lstm\metrics.json`
-- `results\step3_lstm\scenario_split.json`
-- `results\step3_lstm\training_history.csv`
-- `results\step3_lstm\test_predictions.csv`
-- `results\step3_lstm\training_loss.png`
-- `results\step3_lstm\prediction_vs_actual.png`
-- `results\step3_lstm\error_histogram.png`
-
-Script báo MAE/RMSE của LSTM và baseline persistence. Không kết luận LSTM tốt hơn nếu nó không vượt baseline trên test set.
-
-## Ghi chú mô hình
-
-Đây là mô hình nghiên cứu dùng quỹ đạo tròn Kepler và link budget giả định. Nó chưa dùng TLE/SGP4, chưa có mô hình fading/mưa chi tiết và chưa đại diện cho hệ thống 3GPP hoàn chỉnh. Kết quả AI chỉ có ý nghĩa trong phạm vi giả thiết và Dataset đã tạo.
+- Trang 03: lần đầu với một cấu hình vật lý mới phải tính mô phỏng và dự báo; những lần sau với đúng cấu hình đó có thể dùng cache.
+- Khi chỉ đổi Hysteresis, TTT hoặc AI Weight rồi nhấn `CHẠY MÔ PHỎNG`, kết quả vật lý và dự báo LSTM được tái sử dụng; phần chính sách có tham số thay đổi sẽ được tính lại.
+- Trang 02: mô phỏng mỗi kịch bản đã vector hóa, và mỗi cấu hình kịch bản được cache. Lần đầu tạo một bộ Dataset mới vẫn tốn thời gian; lần tạo lại với đúng cấu hình có thể sử dụng cache.
+- Cache Streamlit nằm trong bộ nhớ của tiến trình. Khi tắt hẳn ứng dụng, cache có thể phải tạo lại; `settings.json`, model và CSV vẫn nằm trên ổ đĩa.
+- Thời gian thực tế còn phụ thuộc CPU, RAM, số vệ tinh, thời lượng, chu kỳ lấy mẫu, LSTM và việc dựng biểu đồ Plotly.

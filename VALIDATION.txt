@@ -1,0 +1,25 @@
+NTN AI LEO - PATCH VALIDATION
+
+Syntax:
+  python -m py_compile app.py -> PASS
+
+Scalar vs vectorized simulation (3 planes x 4 satellites, 121 seconds):
+  max |delta elevation|       = 3.84e-13 deg
+  max |delta distance|        = 1.82e-12 km
+  max |delta range rate|      = 1.78e-15 km/s
+  max |delta Doppler|         = 2.27e-13 kHz
+  max |delta delay|           = 7.11e-15 ms
+  max |delta FSPL|            = 2.84e-14 dB
+  max |delta RX power|        = 2.84e-14 dBm
+  max |delta SNR|             = 2.84e-14 dB
+  max |delta best beam offset|= 4.05e-14 dB
+  max |delta best off-axis|   = 6.11e-13 deg
+  best Beam ID equality      = True
+  candidate equality         = True
+
+Sampling interval check:
+  duration=20 seconds, interval=5 seconds -> [0, 5, 10, 15, 20] PASS
+
+Note:
+  Numerical equivalence checks cover the physical simulation functions in the tested
+  configuration. Full Streamlit browser rendering/runtime was not tested on the user's PC.
