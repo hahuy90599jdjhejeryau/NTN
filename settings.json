@@ -1,0 +1,15 @@
+{
+  "station_name": "TĐ. Hà Nội",
+  "sim_time": 0,
+  "altitude_km": 600,
+  "inclination_deg": 53,
+  "n_planes": 6,
+  "sats_per_plane": 12,
+  "raan_center": 98,
+  "plane_spacing": 4,
+  "phase_start": 24,
+  "ho_duration": 720,
+  "hyst_margin": 4.0,
+  "ttt_sec": 3,
+  "ai_weight": 0.65
+}

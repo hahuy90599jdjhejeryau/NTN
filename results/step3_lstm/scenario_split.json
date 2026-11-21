@@ -1,0 +1,18 @@
+{
+  "train": [
+    "SCN_02",
+    "SCN_03",
+    "SCN_04",
+    "SCN_05",
+    "SCN_08",
+    "SCN_09",
+    "SCN_10"
+  ],
+  "validation": [
+    "SCN_01"
+  ],
+  "test": [
+    "SCN_06",
+    "SCN_07"
+  ]
+}

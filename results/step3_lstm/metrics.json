@@ -1,0 +1,35 @@
+{
+  "target": "SNR after forecast horizon (Residual Delta-SNR on active links)",
+  "predicts_delta": true,
+  "lookback_samples": 30,
+  "sample_interval_seconds": 1.0,
+  "horizon_seconds": 5.0,
+  "window_stride": 1,
+  "train_scenarios": [
+    "SCN_02",
+    "SCN_03",
+    "SCN_04",
+    "SCN_05",
+    "SCN_08",
+    "SCN_09",
+    "SCN_10"
+  ],
+  "validation_scenarios": [
+    "SCN_01"
+  ],
+  "test_scenarios": [
+    "SCN_06",
+    "SCN_07"
+  ],
+  "train_windows": 12052,
+  "validation_windows": 2043,
+  "test_windows": 3547,
+  "LSTM": {
+    "MAE_dB": 0.2379644215106964,
+    "RMSE_dB": 3.207721710205078
+  },
+  "Persistence_baseline": {
+    "MAE_dB": 0.5495064854621887,
+    "RMSE_dB": 4.6093363761901855
+  }
+}
